@@ -7,11 +7,11 @@ import mindustry.mod.*;
 import static mindustry.Vars.*;
 
 @SuppressWarnings("unused")
-public class AdvancedDevMode extends Mod {
-    public static final Seq<String> blacklist = Reflect.get(Scripts.class, "blacklist");
-    public static final Seq<String> whitelist = Reflect.get(Scripts.class, "whitelist");
+public class Launcher extends Mod {
+    private static final Seq<String> blacklist = Reflect.get(Scripts.class, "blacklist");
+    private static final Seq<String> whitelist = Reflect.get(Scripts.class, "whitelist");
 
-    public AdvancedDevMode() {
+    public Launcher() {
         enableConsole = true;
 
         blacklist.clear();

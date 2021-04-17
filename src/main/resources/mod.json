@@ -3,7 +3,7 @@
     "displayName": "Advanced Developer Mode",
     "description": "A mod that enables developer console and removes restrictions on access of classes.",
     "author": "Summet",
-    "main": "dev.AdvancedDevMode",
+    "main": "dev.Launcher",
     "hidden": true,
     "java": true,
     "version": "1.0",
