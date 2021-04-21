@@ -2,80 +2,83 @@ import groovy.json.*
 
 apply plugin: 'java'
 
-sourceCompatibility = 1.8
-targetCompatibility = 14
+sourceCompatibility = 14
+targetCompatibility = 1.8
 
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
+    maven { url 'https://www.jitpack.io' }
 }
 
-def json = new JsonSlurper()
-
 ext {
-    mod = json.parseText(file("src/main/resources/mod.json").text)
+    def json = new JsonSlurper()
+    def libs = "$rootDir/build/libs"
+    def modFile = file("mod.json")
+    def mod = json.parseText(modFile.text)
 
-    mindustryVersion = "v${mod['minGameVersion']}"
-    modVersion = mod['version']
-    sdkVersion = '29'
-    sdkRoot = System.getenv("ANDROID_HOME")
-    archivesBaseName = project.name + (!project.modVersion.isEmpty() ? "-$project.modVersion" : "")
+    artifactBaseName = mod.name + (!mod.version.isEmpty() ? "-$mod.version" : "")
 
-    doExec = { cmd ->
-        def proc = cmd.execute(null, new File("$buildDir/libs"))
-        proc.waitForProcessOutput(System.out, System.err)
-    }
+    jarPath = "$libs/${artifactBaseName}-desktop.jar"
+    dexPath = "$libs/${artifactBaseName}-android.jar"
+
+    versions = [:]
+    versions.mindustry = 'v' + mod.minGameVersion
+    versions.jabel = '0.3.0'
 }
 
 dependencies {
-    compileOnly "com.github.Anuken.Arc:arc-core:$mindustryVersion"
-    compileOnly "com.github.Anuken.Mindustry:core:$mindustryVersion"
+    compileOnly "com.github.Anuken.Arc:arc-core:$versions.mindustry"
+    compileOnly "com.github.Anuken.Mindustry:core:$versions.mindustry"
+
+    annotationProcessor "com.github.bsideup.jabel:jabel-javac-plugin:$versions.jabel"
 }
 
-allprojects {
-    tasks.withType(JavaCompile) {
-        if (JavaVersion.current() != JavaVersion.VERSION_1_8) {
-            options.compilerArgs += ['--release', '8']
-        }
-    }
-}
-
-task jarAndroid {
-    dependsOn "jar"
-
-    doLast {
-        def files = (configurations.compileClasspath.asList() + configurations.runtimeClasspath.asList() + [new File("$sdkRoot/platforms/android-$sdkVersion/android.jar")])
-        def dependencies = files.collect { "--classpath $it.path" }.join(" ")
-
-        if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
-            doExec("cmd.exe /c d8 $dependencies --min-api 14 --output ${project.archivesBaseName}-Android.jar ${project.archivesBaseName}-Desktop.jar")
-        } else {
-            doExec("d8 $dependencies --min-api 14 --output ${project.archivesBaseName}-Android.jar ${project.archivesBaseName}-Desktop.jar")
-        }
-    }
-}
-
-jar {
-    archiveFileName = "${project.archivesBaseName}-Desktop.jar"
+task desktop(type: Jar) {
+    archiveBaseName.set "$artifactBaseName-desktop"
 
     from {
-        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+
+    from(rootDir) {
+        include 'mod.json'
+    }
+
+    with jar
+}
+
+task android(type: Exec, dependsOn: desktop) {
+    def command = [
+            'd8', jarPath,
+            '--min-api', '28',
+            '--output', dexPath
+    ]
+
+    if (System.getProperty('os.name').toLowerCase().contains('windows')) {
+        commandLine("cmd", "/c", *command)
+    } else {
+        commandLine(*command)
     }
 }
 
-task deploy(type: Jar) {
-    dependsOn jarAndroid
-    dependsOn jar
+task dist(type: Jar, dependsOn: android) {
+    archiveBaseName.set artifactBaseName
 
-    archiveFileName = "${project.archivesBaseName}.jar"
+    from zipTree(jarPath), zipTree(dexPath)
+}
 
-    from {
-        [zipTree("$buildDir/libs/${project.archivesBaseName}-Desktop.jar"),
-         zipTree("$buildDir/libs/${project.archivesBaseName}-Android.jar")]
+tasks.withType(JavaCompile) {
+    if (JavaVersion.current() != JavaVersion.VERSION_1_8){
+        options.compilerArgs = ['--release', '8', '--enable-preview']
     }
 
-    doLast {
-        delete { delete "$buildDir/libs/${project.archivesBaseName}-Desktop.jar" }
-        delete { delete "$buildDir/libs/${project.archivesBaseName}-Android.jar" }
+    options.compilerArgs << '-Xplugin:jabel'
+
+    doFirst {
+        options.compilerArgs = options.compilerArgs.findAll {
+            it != '--enable-preview'
+        }
     }
 }
