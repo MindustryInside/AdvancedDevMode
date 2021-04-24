@@ -6,6 +6,6 @@
     "main": "dev.Launcher",
     "hidden": true,
     "java": true,
-    "version": "1.0",
+    "version": "1.1",
     "minGameVersion": 126.2
 }
